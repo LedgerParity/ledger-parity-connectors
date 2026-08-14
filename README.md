@@ -53,7 +53,7 @@ go test -v ./...
 
 ## 🤝 Contributing
 
-New application connectors (e.g. Betta-Pay, PayStell, Trustless-Work) can be added by implementing the `connector.Connector` interface. See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+New application connectors (e.g. merchant gateways, payment orchestrators, payroll systems, and smart contract escrows) can be added by implementing the `connector.Connector` interface. See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 ---
 
