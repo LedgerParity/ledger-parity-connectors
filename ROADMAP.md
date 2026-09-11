@@ -7,4 +7,5 @@ Next: independently verify one upstream contract and prove export completeness (
 - [x] Canonical validation, amount/date fixes, provenance and bounded tasks implemented and pushed.
 - [x] Isolated go test/vet/build using fresh module download passed.
 - [ ] Upstream contract verification and operator adoption evidence.
-- [ ] Remote CI confirmation/local race check (environment limits in handoff).
+- [x] Remote CI verified at the revisions linked in PROJECT_HANDOFF.md.
+- [ ] Optional local Windows race execution (no C compiler); Linux CI race tests passed.
