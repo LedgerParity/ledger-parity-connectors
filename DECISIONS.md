@@ -10,3 +10,5 @@ Verification amendment: remote CI at 83fd7ec passed both Go matrix jobs, includi
 ## Implementation update 2026-09-12
 
 SDP release 7.0.0 / 14704274467d267b6c6679052d7251ef6050d118 is the inspected CSV contract. The adapter preserves duplicate claims and rejects unsupported Circle routes, missing destinations and unknown statuses/types. CSV creation/update time is never settlement time; the caller supplies an explicit interval. No completeness inference or authenticated SDP client is added.
+
+Review verdict: the full upstream payment status enum (DRAFT, READY, PENDING, PAUSED, SUCCESS, FAILED, CANCELED) and native asset semantics (XLM/NATIVE with empty issuer) were verified against the pinned revision of payments_state_machine.go and assets.go before confirming the mapping. The core pin bb5d127cae15 is retained intentionally: connectors and its tests only construct/parse internal payment records; production JSON serialization happens in the CLI against its own core pin (954f0913e78d), so a pin bump would add churn without changing behavior.
