@@ -13,3 +13,6 @@ Reviewed 2026-09-11. Baseline adapters declare local field names but cite no ver
 No exhaustive upstream code audit, authenticated API test, partnership or compatibility certification was performed. These source links establish where contract verification should begin, not that local fields match upstream. Soroban-based escrow releases cannot be reconciled by this preview's ordinary-payment ingestor. Legacy examples remain for migration; unsupported/incomplete records yield UNKNOWN in core, not matches.
 
 To promote one adapter: pin an upstream schema/source revision; map every field including network, transaction/operation or event identity, exact amount units, asset issuer/contract, direction, fees and state; document exported-data completeness; add positive/negative fixtures with provenance and permission to redistribute. Validate against an upstream-provided sanitized example. Do not invent missing IDs or network.
+# SDP release-scoped addition (2026-09-12)
+
+`pkg/sdp` now maps the upstream 7.0.0 payment CSV contract at revision 14704274467d267b6c6679052d7251ef6050d118. See [field/coverage limitations](SDP.md). Upstream source and header assertions were inspected; local synthetic mapping/failure tests were executed. This does not upgrade the other named adapters or establish deployed SDP compatibility/adoption.
