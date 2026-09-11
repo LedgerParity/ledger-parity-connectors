@@ -37,7 +37,13 @@ func (f *FileConnector) FetchInternalPayments(ctx context.Context, filter connec
 		return nil, err
 	}
 	defer input.Close()
+	return f.Parse(ctx, input, filter)
+}
+
+// Parse consumes the same bytes a caller can hash for an evidence bundle.
+func (f *FileConnector) Parse(ctx context.Context, input io.Reader, filter connector.Filter) ([]types.InternalPayment, error) {
 	var rows []types.InternalPayment
+	var err error
 	switch f.Format {
 	case "json":
 		rows, err = f.parseJSON(input, filter)
@@ -82,10 +88,10 @@ func (f *FileConnector) validateFilter(records []types.InternalPayment, filter c
 		if err := types.ValidateInternal(p); err != nil {
 			return nil, fmt.Errorf("record %d: %w", i+1, err)
 		}
-		if !filter.TimeStart.IsZero() && p.Timestamp.Before(filter.TimeStart) {
-			continue
-		}
-		if !filter.TimeEnd.IsZero() && p.Timestamp.After(filter.TimeEnd) {
+		if !p.InWindow(filter.TimeStart, filter.TimeEnd) {
+			if !p.SettlementStart.IsZero() && (filter.TimeStart.IsZero() || !p.SettlementEnd.Before(filter.TimeStart)) && (filter.TimeEnd.IsZero() || !p.SettlementStart.After(filter.TimeEnd)) {
+				return nil, fmt.Errorf("record %d: settlement interval crosses filter boundary", i+1)
+			}
 			continue
 		}
 		if filter.Status != "" && !strings.EqualFold(p.Status, filter.Status) {
@@ -106,7 +112,7 @@ func (f *FileConnector) parseCSV(r io.Reader, filter connector.Filter) ([]types.
 	}
 	cols := map[string]int{}
 	allowed := map[string]bool{}
-	for _, h := range strings.Split("id,source_app,network,operation_type,operation_id,reference_id,sender,recipient,amount,asset,asset_type,asset_issuer,asset_contract,timestamp,status", ",") {
+	for _, h := range strings.Split("id,source_app,network,operation_type,operation_id,reference_id,business_reference,sender,recipient,amount,asset,asset_type,asset_issuer,asset_contract,timestamp,settlement_start,settlement_end,status", ",") {
 		allowed[h] = true
 	}
 	for i, h := range headers {
@@ -133,11 +139,17 @@ func (f *FileConnector) parseCSV(r io.Reader, filter connector.Filter) ([]types.
 			}
 			return ""
 		}
-		ts, err := time.Parse(time.RFC3339, val("timestamp"))
-		if err != nil {
-			return nil, fmt.Errorf("row %d timestamp: %w", len(rows)+2, err)
+		times := map[string]time.Time{}
+		for _, key := range []string{"timestamp", "settlement_start", "settlement_end"} {
+			if val(key) != "" {
+				ts, err := time.Parse(time.RFC3339, val(key))
+				if err != nil {
+					return nil, fmt.Errorf("row %d: invalid %s", len(rows)+2, key)
+				}
+				times[key] = ts
+			}
 		}
-		rows = append(rows, types.InternalPayment{ID: val("id"), SourceApp: val("source_app"), Network: val("network"), OperationType: val("operation_type"), OperationID: val("operation_id"), ReferenceID: val("reference_id"), Sender: val("sender"), Recipient: val("recipient"), Amount: val("amount"), Asset: val("asset"), AssetType: val("asset_type"), AssetIssuer: val("asset_issuer"), AssetContract: val("asset_contract"), Timestamp: ts, Status: val("status")})
+		rows = append(rows, types.InternalPayment{ID: val("id"), SourceApp: val("source_app"), Network: val("network"), OperationType: val("operation_type"), OperationID: val("operation_id"), ReferenceID: val("reference_id"), BusinessReference: val("business_reference"), Sender: val("sender"), Recipient: val("recipient"), Amount: val("amount"), Asset: val("asset"), AssetType: val("asset_type"), AssetIssuer: val("asset_issuer"), AssetContract: val("asset_contract"), Timestamp: times["timestamp"], SettlementStart: times["settlement_start"], SettlementEnd: times["settlement_end"], Status: val("status")})
 	}
 	return f.validateFilter(rows, filter)
 }

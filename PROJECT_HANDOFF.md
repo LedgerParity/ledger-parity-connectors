@@ -9,3 +9,8 @@ Local test/vet/build passed on Go 1.24.4. An exported source archive passed with
 Remote CI passed at 83fd7ec: https://github.com/LedgerParity/ledger-parity-connectors/actions/runs/34653797659 (two Go matrix jobs: minimum 1.22.2 and stable, configured Linux race tests/vet/build). This completion documentation commit changes no runtime/CI. Local Windows race execution lacked a C compiler; remote Linux evidence is distinct. Core and CLI verification/run links are recorded in CLI docs/VERIFICATION.md.
 
 Next: independently verify one upstream contract using revision-pinned field mappings and a permitted sanitized fixture, or record an unsupported verdict. Resolve caller export completeness before asserting complete coverage. See docs/backlog.md and ROADMAP.md. No live upstream adapter compatibility, partnership, adoption or Drips approval is claimed. Original rejection text/application remain absent; the user's recollection concerns Stellar relevance/impact.
+
+
+## Implementation update 2026-09-12
+
+Follow-up implementation: pkg/sdp plus contract/negative matching tests and docs/SDP.md. It imports the inspected release CSV using independently asserted sender/network/time scope; no live SDP instance or operator export was tested. Existing named experimental adapters remain experimental. Canonical interval/business-reference fields are supported, with filter-boundary errors rather than silent partial exclusion.

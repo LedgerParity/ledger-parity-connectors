@@ -5,3 +5,8 @@
 3. Input size and duplicate JSON keys. Bound memory use and reject duplicate object keys without changing decimal lexemes. Acceptance: large/duplicate-key fixtures fail deterministically; empty valid arrays and nested metadata still work. Coordinate the shared decoder with CLI.
 
 Ask the maintainer to confirm scope/availability before assignment; open a small PR with regression evidence. No Wave points or review-time promises are attached.
+
+
+## Implementation update 2026-09-12
+
+Completed follow-up: SDP 7.0.0 synthetic contract mapping. Next task: independently verify a sanitized export from that release, document sender/time/route provenance, and test any schema or timestamp differences before expanding compatibility. Add per-record interval export only from an independently verified source.

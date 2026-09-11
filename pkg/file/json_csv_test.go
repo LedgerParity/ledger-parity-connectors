@@ -63,3 +63,19 @@ func TestFetchContextAndFormat(t *testing.T) {
 		t.Fatal("ignored cancellation")
 	}
 }
+
+func TestIntervalCSVAndPartialFilter(t *testing.T) {
+	f := NewFileConnector("", "csv", "test")
+	raw := "id,network,operation_type,sender,recipient,amount,asset,asset_type,settlement_start,settlement_end,status,business_reference\n1,test,payment,A,B,1,XLM,native,2026-09-01T11:00:00Z,2026-09-01T13:00:00Z,completed,invoice-1\n"
+	rows, err := f.parseCSV(strings.NewReader(raw), connector.Filter{})
+	if err != nil || len(rows) != 1 || !rows[0].Timestamp.IsZero() || rows[0].BusinessReference != "invoice-1" {
+		t.Fatal(rows, err)
+	}
+	if _, err = f.parseCSV(strings.NewReader(raw), connector.Filter{TimeStart: payment().Timestamp}); err == nil {
+		t.Fatal("partial interval silently filtered")
+	}
+	rows, err = f.parseCSV(strings.NewReader(raw), connector.Filter{TimeStart: payment().Timestamp.Add(2 * time.Hour)})
+	if err != nil || len(rows) != 0 {
+		t.Fatal("nonoverlapping filter", rows, err)
+	}
+}
