@@ -6,23 +6,31 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/LedgerParity/ledger-parity-connectors/pkg/connector"
 	"github.com/LedgerParity/ledger-parity-core/pkg/types"
+	"github.com/LedgerParity/ledger-parity-core/pkg/utils"
 )
 
-// StellopayPaymentRecord matches the internal schema of the Stellopay payroll platform.
+// StellopayPaymentRecord is an experimental local example schema, not a verified upstream contract.
 type StellopayPaymentRecord struct {
-	PaymentID        string  `json:"payment_id"`
-	BatchID          string  `json:"batch_id"`
-	EmployeeWallet   string  `json:"employee_wallet"`
-	EmployerWallet   string  `json:"employer_wallet"`
-	AmountXLM        float64 `json:"amount_xlm"`
-	Currency         string  `json:"currency"`
-	Status           string  `json:"status"` // "COMPLETED", "SUBMITTED", "FAILED"
-	ProcessedAt      string  `json:"processed_at"`
-	StellarTxHash    string  `json:"stellar_tx_hash"`
+	Network        string      `json:"network"`
+	OperationType  string      `json:"operation_type"`
+	OperationID    string      `json:"operation_id"`
+	AssetType      string      `json:"asset_type"`
+	AssetIssuer    string      `json:"asset_issuer"`
+	AssetContract  string      `json:"asset_contract"`
+	PaymentID      string      `json:"payment_id"`
+	BatchID        string      `json:"batch_id"`
+	EmployeeWallet string      `json:"employee_wallet"`
+	EmployerWallet string      `json:"employer_wallet"`
+	AmountXLM      json.Number `json:"amount_xlm"`
+	Currency       string      `json:"currency"`
+	Status         string      `json:"status"` // "COMPLETED", "SUBMITTED", "FAILED"
+	ProcessedAt    string      `json:"processed_at"`
+	StellarTxHash  string      `json:"stellar_tx_hash"`
 }
 
 // StellopayConnector adapts Stellopay's payment records into normalized InternalPayment structs.
@@ -56,9 +64,13 @@ func (s *StellopayConnector) parseRecords(r io.Reader, filter connector.Filter) 
 
 	var payments []types.InternalPayment
 	for _, rec := range records {
+		amount, err := utils.ParsePaymentAmount(rec.AmountXLM.String())
+		if err != nil {
+			return nil, err
+		}
 		ts, err := time.Parse(time.RFC3339, rec.ProcessedAt)
 		if err != nil {
-			ts = time.Now()
+			return nil, fmt.Errorf("invalid timestamp: %w", err)
 		}
 
 		if !filter.TimeStart.IsZero() && ts.Before(filter.TimeStart) {
@@ -74,12 +86,13 @@ func (s *StellopayConnector) parseRecords(r io.Reader, filter connector.Filter) 
 		}
 
 		p := types.InternalPayment{
+			Network: rec.Network, OperationType: rec.OperationType, OperationID: rec.OperationID, AssetType: rec.AssetType, AssetIssuer: rec.AssetIssuer, AssetContract: rec.AssetContract,
 			ID:          rec.PaymentID,
 			SourceApp:   "stellopay",
 			ReferenceID: rec.StellarTxHash,
 			Sender:      rec.EmployerWallet,
 			Recipient:   rec.EmployeeWallet,
-			Amount:      fmt.Sprintf("%.7f", rec.AmountXLM),
+			Amount:      utils.FormatScaledAmount(amount, 7),
 			Asset:       asset,
 			Timestamp:   ts,
 			Status:      rec.Status,
@@ -88,8 +101,14 @@ func (s *StellopayConnector) parseRecords(r io.Reader, filter connector.Filter) 
 			},
 		}
 
+		if filter.Status != "" && !strings.EqualFold(p.Status, filter.Status) {
+			continue
+		}
 		payments = append(payments, p)
 	}
 
+	if filter.Limit > 0 && len(payments) > filter.Limit {
+		return nil, fmt.Errorf("limit would truncate input")
+	}
 	return payments, nil
 }
