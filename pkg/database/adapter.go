@@ -2,7 +2,9 @@ package database
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"github.com/LedgerParity/ledger-parity-core/pkg/utils"
 	"strconv"
 	"time"
 
@@ -12,19 +14,24 @@ import (
 
 // ColumnMapping defines how database table columns map to InternalPayment fields.
 type ColumnMapping struct {
-	IDColumn        string `json:"id_column"`
-	SenderColumn    string `json:"sender_column"`
-	RecipientColumn string `json:"recipient_column"`
-	AmountColumn    string `json:"amount_column"`
-	CurrencyColumn  string `json:"currency_column"`
-	TimestampColumn string `json:"timestamp_column"`
-	StatusColumn    string `json:"status_column"`
-	TxHashColumn    string `json:"tx_hash_column"`
+	NetworkColumn       string `json:"network_column"`
+	OperationTypeColumn string `json:"operation_type_column"`
+	OperationIDColumn   string `json:"operation_id_column"`
+	AssetTypeColumn     string `json:"asset_type_column"`
+	AssetIssuerColumn   string `json:"asset_issuer_column"`
+	IDColumn            string `json:"id_column"`
+	SenderColumn        string `json:"sender_column"`
+	RecipientColumn     string `json:"recipient_column"`
+	AmountColumn        string `json:"amount_column"`
+	CurrencyColumn      string `json:"currency_column"`
+	TimestampColumn     string `json:"timestamp_column"`
+	StatusColumn        string `json:"status_column"`
+	TxHashColumn        string `json:"tx_hash_column"`
 }
 
 // DefaultColumnMapping returns standard column names for payment tables.
 func DefaultColumnMapping() ColumnMapping {
-	return ColumnMapping{
+	return ColumnMapping{NetworkColumn: "network", OperationTypeColumn: "operation_type", OperationIDColumn: "operation_id", AssetTypeColumn: "asset_type", AssetIssuerColumn: "asset_issuer",
 		IDColumn:        "id",
 		SenderColumn:    "sender_address",
 		RecipientColumn: "recipient_address",
@@ -113,10 +120,16 @@ func (d *DatabaseConnector) MapRowToPayment(row RowData) (types.InternalPayment,
 		currVal = "XLM"
 	}
 
-	amountVal := formatAmountVal(row[d.mapping.AmountColumn])
-	tsVal := parseTimestampVal(row[d.mapping.TimestampColumn])
+	amountVal, err := formatAmountVal(row[d.mapping.AmountColumn])
+	if err != nil {
+		return types.InternalPayment{}, err
+	}
+	tsVal, err := parseTimestampVal(row[d.mapping.TimestampColumn])
+	if err != nil {
+		return types.InternalPayment{}, err
+	}
 
-	payment := types.InternalPayment{
+	payment := types.InternalPayment{Network: getStringVal(row, d.mapping.NetworkColumn), OperationType: getStringVal(row, d.mapping.OperationTypeColumn), OperationID: getStringVal(row, d.mapping.OperationIDColumn), AssetType: getStringVal(row, d.mapping.AssetTypeColumn), AssetIssuer: getStringVal(row, d.mapping.AssetIssuerColumn),
 		ID:          idVal,
 		SourceApp:   d.sourceApp,
 		ReferenceID: txHashVal,
@@ -144,45 +157,38 @@ func getStringVal(row RowData, key string) string {
 	return ""
 }
 
-func formatAmountVal(val interface{}) string {
-	if val == nil {
-		return "0.0000000"
-	}
+func formatAmountVal(val interface{}) (string, error) {
+	var s string
 	switch v := val.(type) {
-	case float64:
-		return fmt.Sprintf("%.7f", v)
-	case float32:
-		return fmt.Sprintf("%.7f", float64(v))
-	case int:
-		return fmt.Sprintf("%.7f", float64(v))
-	case int64:
-		return fmt.Sprintf("%.7f", float64(v))
 	case string:
-		if f, err := strconv.ParseFloat(v, 64); err == nil {
-			return fmt.Sprintf("%.7f", f)
-		}
-		return v
+		s = v
+	case []byte:
+		s = string(v)
+	case json.Number:
+		s = v.String()
+	case int:
+		s = strconv.Itoa(v)
+	case int64:
+		s = strconv.FormatInt(v, 10)
 	default:
-		return fmt.Sprintf("%v", v)
+		return "", fmt.Errorf("amount requires decimal text or integer, never floating point")
 	}
+	n, err := utils.ParsePaymentAmount(s)
+	if err != nil {
+		return "", err
+	}
+	return utils.FormatScaledAmount(n, 7), nil
 }
-
-func parseTimestampVal(val interface{}) time.Time {
-	if val == nil {
-		return time.Now()
-	}
+func parseTimestampVal(val interface{}) (time.Time, error) {
 	switch v := val.(type) {
 	case time.Time:
-		return v
+		if !v.IsZero() {
+			return v, nil
+		}
 	case string:
-		if t, err := time.Parse(time.RFC3339, v); err == nil {
-			return t
-		}
-		if t, err := time.Parse("2006-01-02 15:04:05", v); err == nil {
-			return t
-		}
+		return time.Parse(time.RFC3339, v)
 	case int64:
-		return time.Unix(v, 0)
+		return time.Unix(v, 0).UTC(), nil
 	}
-	return time.Now()
+	return time.Time{}, fmt.Errorf("invalid or missing timestamp")
 }

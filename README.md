@@ -1,62 +1,23 @@
-# ledger-parity-connectors
+﻿# ledger-parity-connectors
 
-[![CI](https://github.com/LedgerParity/ledger-parity-connectors/actions/workflows/ci.yml/badge.svg)](https://github.com/LedgerParity/ledger-parity-connectors/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+Validated JSON/CSV application-payment exports for LedgerParity's read-only Stellar reconciliation. This library owns input mapping; [core](https://github.com/LedgerParity/ledger-parity-core) owns matching and Horizon ingestion; [CLI](https://github.com/LedgerParity/ledger-parity-cli) owns the runnable operator workflow.
 
-`ledger-parity-connectors` is the adapter library for **LedgerParity**, providing target-app payment ingestors that transform proprietary database schemas and file exports into normalized `InternalPayment` models.
+From this checkout alone, with Go 1.22.2+:
 
----
-
-## 🔌 Supported Connectors & Adapters
-
-- **Generic File Connector (`pkg/file`):** Ingests local CSV and JSON payment exports with flexible column mapping.
-- **Stellopay Adapter (`pkg/stellopay`):** Ingests payment batch records from [Stellopay](https://github.com/search?q=stellopay) payroll platform exports.
-- **Facil-Pay Adapter (`pkg/facilpay`):** Ingests merchant checkout and escrow transaction records from [Facil-Pay](https://github.com/search?q=facil-pay) payment exports.
-
----
-
-## 📦 Usage Example
-
-```go
-package main
-
-import (
-	"context"
-	"fmt"
-
-	"github.com/LedgerParity/ledger-parity-connectors/pkg/connector"
-	"github.com/LedgerParity/ledger-parity-connectors/pkg/stellopay"
-)
-
-func main() {
-	conn := stellopay.NewStellopayConnector("stellopay_export.json")
-	payments, err := conn.FetchInternalPayments(context.Background(), connector.Filter{})
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Printf("Fetched %d normalized internal payments\n", len(payments))
-}
+```sh
+go test ./...
+go vet ./...
+go build ./...
 ```
 
----
+The core dependency is pinned to a published Git revision in go.mod/go.sum. No sibling checkout or replacement directive is required.
 
-## 🧪 Testing
+Use `file.NewFileConnector(path, "json", "your-app")` and `FetchInternalPayments(context.Background(), connector.Filter{})`. The supported source is an array of canonical `types.InternalPayment` records. CSV uses exact canonical field names: id, source_app, network, operation_type, operation_id, reference_id, sender, recipient, amount, asset, asset_type, asset_issuer, asset_contract, timestamp, status. Unknown/duplicate CSV columns, unknown JSON fields, malformed amounts and timestamps fail. All rows validate before filtering; limits return an error rather than silently truncate. A valid empty export is `[]`, not null.
 
-Run tests across all connector adapters:
+Required: ID, exact network passphrase, operation_type `payment`, sender, recipient, positive decimal-string amount (at most seven places), asset/type (and issuer for credit assets), RFC3339 timestamp and status. Native XLM has type native and no issuer. Source app defaults to the connector name. Operation ID is recommended; reference ID means transaction hash, never memo. Unsupported contract tokens are rejected. For a complete runnable fixture see CLI examples/.
 
-```bash
-go test -v ./...
-```
+`database` accepts a caller-supplied row fetch function, not a built-in SQL connection. Return exact decimal text/bytes, json.Number or integral values for amounts; float32/float64 and missing values are rejected. Missing timestamps are errors. Its mapping can preserve network, operation ID/type and issuer. The caller still owns export completeness and must validate mapped records before asserting coverage.
 
----
+`stellopay`, `facilpay` and `trustlesswork` are **experimental local-schema examples, not verified integrations**. Their test data is synthetic, and legacy records may lack required identity. They preserve decimal JSON numbers exactly and reject malformed timestamps, but they do not establish upstream compatibility or settlement. They are not selected by the supported CLI. See [provenance](docs/PROVENANCE.md) before using or extending them.
 
-## 🤝 Contributing
-
-New application connectors (e.g. merchant gateways, payment orchestrators, payroll systems, and smart contract escrows) can be added by implementing the `connector.Connector` interface. See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
-
----
-
-## 📄 License
-
-[MIT License](LICENSE) © LedgerParity Maintainers.
+[Contributing](CONTRIBUTING.md) · [tasks](docs/backlog.md) · [security](SECURITY.md) · [MIT](LICENSE). Developer preview; no partnership, adoption or Drips acceptance is claimed.

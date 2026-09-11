@@ -5,67 +5,82 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"github.com/LedgerParity/ledger-parity-connectors/pkg/connector"
+	"github.com/LedgerParity/ledger-parity-core/pkg/types"
 	"io"
 	"os"
 	"strings"
 	"time"
-
-	"github.com/LedgerParity/ledger-parity-connectors/pkg/connector"
-	"github.com/LedgerParity/ledger-parity-core/pkg/types"
 )
 
-// FileConnector reads internal payment records from JSON or CSV files.
-type FileConnector struct {
-	FilePath   string
-	Format     string // "json" or "csv"
-	TargetName string
-}
+type FileConnector struct{ FilePath, Format, TargetName string }
 
-func NewFileConnector(filePath, format, targetName string) *FileConnector {
+func NewFileConnector(path, format, name string) *FileConnector {
 	if format == "" {
-		if strings.HasSuffix(filePath, ".csv") {
+		format = "json"
+		if strings.HasSuffix(strings.ToLower(path), ".csv") {
 			format = "csv"
-		} else {
-			format = "json"
 		}
 	}
-	if targetName == "" {
-		targetName = "file_export"
+	if name == "" {
+		name = "file_export"
 	}
-	return &FileConnector{
-		FilePath:   filePath,
-		Format:     format,
-		TargetName: targetName,
-	}
+	return &FileConnector{path, format, name}
 }
-
-func (f *FileConnector) Name() string {
-	return f.TargetName
-}
-
+func (f *FileConnector) Name() string { return f.TargetName }
 func (f *FileConnector) FetchInternalPayments(ctx context.Context, filter connector.Filter) ([]types.InternalPayment, error) {
-	file, err := os.Open(f.FilePath)
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	input, err := os.Open(f.FilePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open file %s: %w", f.FilePath, err)
+		return nil, err
 	}
-	defer file.Close()
-
-	if strings.EqualFold(f.Format, "csv") {
-		return f.parseCSV(file, filter)
+	defer input.Close()
+	var rows []types.InternalPayment
+	switch f.Format {
+	case "json":
+		rows, err = f.parseJSON(input, filter)
+	case "csv":
+		rows, err = f.parseCSV(input, filter)
+	default:
+		return nil, fmt.Errorf("unsupported file format %q", f.Format)
 	}
-	return f.parseJSON(file, filter)
+	if err != nil {
+		return nil, err
+	}
+	if err = ctx.Err(); err != nil {
+		return nil, err
+	}
+	return rows, nil
 }
-
 func (f *FileConnector) parseJSON(r io.Reader, filter connector.Filter) ([]types.InternalPayment, error) {
 	var records []types.InternalPayment
-	if err := json.NewDecoder(r).Decode(&records); err != nil {
-		return nil, fmt.Errorf("failed decoding JSON payments: %w", err)
+	dec := json.NewDecoder(r)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&records); err != nil {
+		return nil, fmt.Errorf("invalid payment JSON: %w", err)
 	}
-
-	var filtered []types.InternalPayment
-	for _, p := range records {
+	var extra any
+	if err := dec.Decode(&extra); err != io.EOF {
+		return nil, fmt.Errorf("expected one JSON array")
+	}
+	if records == nil {
+		return nil, fmt.Errorf("expected payment array, not null")
+	}
+	return f.validateFilter(records, filter)
+}
+func (f *FileConnector) validateFilter(records []types.InternalPayment, filter connector.Filter) ([]types.InternalPayment, error) {
+	if filter.Limit < 0 || (!filter.TimeEnd.IsZero() && filter.TimeEnd.Before(filter.TimeStart)) {
+		return nil, fmt.Errorf("invalid filter")
+	}
+	rows := []types.InternalPayment{}
+	for i, p := range records {
 		if p.SourceApp == "" {
 			p.SourceApp = f.TargetName
+		}
+		if err := types.ValidateInternal(p); err != nil {
+			return nil, fmt.Errorf("record %d: %w", i+1, err)
 		}
 		if !filter.TimeStart.IsZero() && p.Timestamp.Before(filter.TimeStart) {
 			continue
@@ -76,29 +91,34 @@ func (f *FileConnector) parseJSON(r io.Reader, filter connector.Filter) ([]types
 		if filter.Status != "" && !strings.EqualFold(p.Status, filter.Status) {
 			continue
 		}
-		filtered = append(filtered, p)
+		rows = append(rows, p)
 	}
-
-	if filter.Limit > 0 && len(filtered) > filter.Limit {
-		filtered = filtered[:filter.Limit]
+	if filter.Limit > 0 && len(rows) > filter.Limit {
+		return nil, fmt.Errorf("filter limit would truncate export; use a narrower window or no limit")
 	}
-
-	return filtered, nil
+	return rows, nil
 }
-
 func (f *FileConnector) parseCSV(r io.Reader, filter connector.Filter) ([]types.InternalPayment, error) {
 	reader := csv.NewReader(r)
 	headers, err := reader.Read()
 	if err != nil {
-		return nil, fmt.Errorf("failed reading CSV header: %w", err)
+		return nil, err
 	}
-
-	colMap := make(map[string]int)
-	for idx, h := range headers {
-		colMap[strings.ToLower(strings.TrimSpace(h))] = idx
+	cols := map[string]int{}
+	allowed := map[string]bool{}
+	for _, h := range strings.Split("id,source_app,network,operation_type,operation_id,reference_id,sender,recipient,amount,asset,asset_type,asset_issuer,asset_contract,timestamp,status", ",") {
+		allowed[h] = true
 	}
-
-	var payments []types.InternalPayment
+	for i, h := range headers {
+		if !allowed[h] {
+			return nil, fmt.Errorf("unknown CSV column %q", h)
+		}
+		if _, ok := cols[h]; ok {
+			return nil, fmt.Errorf("duplicate CSV column %q", h)
+		}
+		cols[h] = i
+	}
+	rows := []types.InternalPayment{}
 	for {
 		row, err := reader.Read()
 		if err == io.EOF {
@@ -107,60 +127,17 @@ func (f *FileConnector) parseCSV(r io.Reader, filter connector.Filter) ([]types.
 		if err != nil {
 			return nil, err
 		}
-
-		getVal := func(keys ...string) string {
-			for _, k := range keys {
-				if idx, ok := colMap[k]; ok && idx < len(row) {
-					return strings.TrimSpace(row[idx])
-				}
+		val := func(k string) string {
+			if i, ok := cols[k]; ok {
+				return row[i]
 			}
 			return ""
 		}
-
-		tsStr := getVal("timestamp", "created_at", "date", "time")
-		ts, err := time.Parse(time.RFC3339, tsStr)
+		ts, err := time.Parse(time.RFC3339, val("timestamp"))
 		if err != nil {
-			ts, err = time.Parse("2006-01-02 15:04:05", tsStr)
-			if err != nil {
-				ts = time.Now()
-			}
+			return nil, fmt.Errorf("row %d timestamp: %w", len(rows)+2, err)
 		}
-
-		if !filter.TimeStart.IsZero() && ts.Before(filter.TimeStart) {
-			continue
-		}
-		if !filter.TimeEnd.IsZero() && ts.After(filter.TimeEnd) {
-			continue
-		}
-
-		status := getVal("status", "state")
-		if filter.Status != "" && !strings.EqualFold(status, filter.Status) {
-			continue
-		}
-
-		asset := getVal("asset", "token", "currency")
-		if asset == "" {
-			asset = "XLM"
-		}
-
-		p := types.InternalPayment{
-			ID:          getVal("id", "payment_id", "tx_id"),
-			SourceApp:   f.TargetName,
-			ReferenceID: getVal("reference_id", "ref_id", "hash", "transaction_hash"),
-			Sender:      getVal("sender", "from", "source"),
-			Recipient:   getVal("recipient", "to", "destination", "recipient_address"),
-			Amount:      getVal("amount", "amt", "value"),
-			Asset:       asset,
-			Timestamp:   ts,
-			Status:      status,
-		}
-
-		payments = append(payments, p)
+		rows = append(rows, types.InternalPayment{ID: val("id"), SourceApp: val("source_app"), Network: val("network"), OperationType: val("operation_type"), OperationID: val("operation_id"), ReferenceID: val("reference_id"), Sender: val("sender"), Recipient: val("recipient"), Amount: val("amount"), Asset: val("asset"), AssetType: val("asset_type"), AssetIssuer: val("asset_issuer"), AssetContract: val("asset_contract"), Timestamp: ts, Status: val("status")})
 	}
-
-	if filter.Limit > 0 && len(payments) > filter.Limit {
-		payments = payments[:filter.Limit]
-	}
-
-	return payments, nil
+	return f.validateFilter(rows, filter)
 }

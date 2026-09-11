@@ -16,7 +16,7 @@ func TestDatabaseAdapter_MapRowToPayment(t *testing.T) {
 				"id":                "DB-TX-1001",
 				"sender_address":    "GBSENDERXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
 				"recipient_address": "GBRECIPIENTXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
-				"amount":            750.25,
+				"amount":            "750.25",
 				"currency":          "USDC",
 				"created_at":        "2026-08-14T09:00:00Z",
 				"status":            "CONFIRMED",
@@ -65,5 +65,21 @@ func TestDatabaseAdapter_MapRowToPayment(t *testing.T) {
 	}
 	if p2.Asset != "XLM" {
 		t.Errorf("expected Asset XLM, got %s", p2.Asset)
+	}
+}
+
+func TestRejectLossyDatabaseValues(t *testing.T) {
+	c := NewDatabaseConnector("test", "test", DefaultColumnMapping(), nil)
+	for _, amount := range []interface{}{float64(1.1), float32(1), nil, "1.00000001", "NaN"} {
+		if _, err := c.MapRowToPayment(RowData{"id": "1", "amount": amount, "created_at": "2026-09-01T12:00:00Z"}); err == nil {
+			t.Fatalf("accepted %v", amount)
+		}
+	}
+	if _, err := c.MapRowToPayment(RowData{"id": "1", "amount": "1", "created_at": "invalid"}); err == nil {
+		t.Fatal("timestamp fabricated")
+	}
+	p, err := c.MapRowToPayment(RowData{"id": "1", "amount": "922337203685.4775807", "created_at": "2026-09-01T12:00:00Z"})
+	if err != nil || p.Amount != "922337203685.4775807" {
+		t.Fatal(p, err)
 	}
 }
