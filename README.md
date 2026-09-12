@@ -1,5 +1,11 @@
 ﻿# ledger-parity-connectors
 
+![LedgerParity](assets/lp-banner.png)
+
+[![Go](https://img.shields.io/badge/Go-1.22.2%2B-3FE0C4?style=flat&logo=go&logoColor=white&labelColor=0B0E1E)](https://go.dev/dl/)
+[![License](https://img.shields.io/github/license/LedgerParity/ledger-parity-connectors?style=flat&color=7A5CFF)](LICENSE)
+[![CI](https://img.shields.io/github/actions/workflow/status/LedgerParity/ledger-parity-connectors/ci.yml?branch=main&style=flat&label=CI&logo=github&labelColor=0B0E1E)](.github/workflows/ci.yml)
+
 Validated JSON/CSV application-payment exports for LedgerParity's read-only Stellar reconciliation. This library owns input mapping; [core](https://github.com/LedgerParity/ledger-parity-core) owns matching and Horizon ingestion; [CLI](https://github.com/LedgerParity/ledger-parity-cli) owns the runnable operator workflow.
 
 The [SDP 7.0.0 CSV adapter](docs/SDP.md) maps a pinned upstream export contract with explicit sender/network/settlement scope and preserves business references separately. It discards contact fields and rejects unsupported routes. Canonical JSON/CSV also accept `business_reference` and `settlement_start`/`settlement_end` instead of `timestamp`; intervals crossing a filter boundary fail rather than disappear. This is synthetic contract-test coverage, not deployed SDP validation.
