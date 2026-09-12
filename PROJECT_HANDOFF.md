@@ -14,3 +14,5 @@ Next: independently verify one upstream contract using revision-pinned field map
 ## Implementation update 2026-09-12
 
 Follow-up implementation: pkg/sdp plus contract/negative matching tests and docs/SDP.md. It imports the inspected release CSV using independently asserted sender/network/time scope; no live SDP instance or operator export was tested. Existing named experimental adapters remain experimental. Canonical interval/business-reference fields are supported, with filter-boundary errors rather than silent partial exclusion.
+
+Brand and documentation handover 2026-09-12: org brand assets and a static documentation site (https://ledgerparity.github.io/) are live; the LedgerParity/.github org profile repository is staged locally but not yet created on GitHub. This commit is documentation only.
