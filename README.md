@@ -31,3 +31,8 @@ Required: ID, exact network passphrase, operation_type `payment`, sender, recipi
 `stellopay`, `facilpay` and `trustlesswork` are **experimental local-schema examples, not verified integrations**. Their test data is synthetic, and legacy records may lack required identity. They preserve decimal JSON numbers exactly and reject malformed timestamps, but they do not establish upstream compatibility or settlement. They are not selected by the supported CLI. See [provenance](docs/PROVENANCE.md) before using or extending them.
 
 [Contributing](CONTRIBUTING.md) · [tasks](docs/backlog.md) · [security](SECURITY.md) · [MIT](LICENSE). Developer preview; no partnership, adoption or Drips acceptance is claimed.
+
+## Stellar Wave submission preparation
+
+See the [submission brief](docs/SUBMISSION.md), [verification record](docs/VERIFICATION_OCT09.md),
+[maintainers](MAINTAINERS.md), and [focused contributor backlog](docs/WAVE_BACKLOG.md).
