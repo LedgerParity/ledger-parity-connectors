@@ -34,7 +34,7 @@ pkg/file/; pkg/database/; tests/
 
 ## Contribution Guidelines
 
-Agree bounded scope with xteesamz or EthTobi through GitHub. Use a focused PR
+Agree bounded scope with EthTobi through GitHub. Use a focused PR
 with `Closes #<issue_id>`, actual check results, and remaining limitations.
 
 ## 2. Specify database fetch completeness and cancellation metadata
@@ -67,7 +67,7 @@ pkg/database/; pkg/connector/; tests/
 
 ## Contribution Guidelines
 
-Agree bounded scope with xteesamz or EthTobi through GitHub. Use a focused PR
+Agree bounded scope with EthTobi through GitHub. Use a focused PR
 with `Closes #<issue_id>`, actual check results, and remaining limitations.
 
 ## 3. Validate a sanitized SDP 7.0.0 export independently
@@ -100,7 +100,7 @@ pkg/sdp/; docs/SDP.md; fixtures/
 
 ## Contribution Guidelines
 
-Agree bounded scope with xteesamz or EthTobi through GitHub. Use a focused PR
+Agree bounded scope with EthTobi through GitHub. Use a focused PR
 with `Closes #<issue_id>`, actual check results, and remaining limitations.
 
 ## 4. Audit one named adapter against a pinned upstream contract
@@ -133,7 +133,7 @@ pkg/stellopay/; pkg/trustlesswork/; pkg/facilpay/; docs/
 
 ## Contribution Guidelines
 
-Agree bounded scope with xteesamz or EthTobi through GitHub. Use a focused PR
+Agree bounded scope with EthTobi through GitHub. Use a focused PR
 with `Closes #<issue_id>`, actual check results, and remaining limitations.
 
 ## 5. Test interval filters at export-window boundaries
@@ -165,7 +165,7 @@ pkg/file/; pkg/sdp/; tests/
 
 ## Contribution Guidelines
 
-Agree bounded scope with xteesamz or EthTobi through GitHub. Use a focused PR
+Agree bounded scope with EthTobi through GitHub. Use a focused PR
 with `Closes #<issue_id>`, actual check results, and remaining limitations.
 
 ## 6. Document canonical consumer error and precision examples
@@ -197,7 +197,7 @@ README.md; examples/; pkg/connector/
 
 ## Contribution Guidelines
 
-Agree bounded scope with xteesamz or EthTobi through GitHub. Use a focused PR
+Agree bounded scope with EthTobi through GitHub. Use a focused PR
 with `Closes #<issue_id>`, actual check results, and remaining limitations.
 
 ## Published issue links
